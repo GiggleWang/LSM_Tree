@@ -2,18 +2,32 @@
 #include "utils.h"
 #include <fstream>
 
-vLog::vLog(const std::string &filename)
-        : filename(filename), head(0), tail(0) {
-    uint64_t fileLength = getFileSizeInBits(filename);
-    if (fileLength > 0) {
-        head = fileLength;
-        //寻找tail值
-        tail = findFirstValidDataPosition(filename);
-        if (tail < 0) {
-            tail = head;
-        }
+vLog::vLog(const std::string &filename) : filename(filename), head(0), tail(0) {
+    std::fstream file(filename, std::ios::in | std::ios::out | std::ios::binary); // 尝试以读写模式打开文件
+    if (!file.is_open()) { // 如果文件不存在或无法打开
+        file.open(filename, std::ios::out | std::ios::binary); // 以写模式打开以创建文件
+        file.close(); // 关闭文件流
+        file.open(filename, std::ios::in | std::ios::out | std::ios::binary); // 重新以读写模式打开
     }
+
+    if (!file.is_open()) {
+        throw std::runtime_error("Failed to open or create file: " + filename);
+    }
+
+    uint64_t fileLength = getFileSizeInByte(filename);
+    if (fileLength == 0) {
+        std::cout << "New file created: " << filename << std::endl;
+        head = fileLength;
+        tail = findFirstValidDataPosition(filename);
+        std::cout << "head = " << head << " tail = " << tail << std::endl;
+    } else {
+        head = fileLength;
+        tail = findFirstValidDataPosition(filename);
+        std::cout << "head = " << head << " tail = " << tail << std::endl;
+    }
+    file.close();  // Make sure to close the file
 }
+
 
 vLog::~vLog() {
 }
@@ -21,7 +35,7 @@ vLog::~vLog() {
 uint64_t vLog::appendEntry(uint64_t key, const std::string &value) {
     std::ofstream file(filename, std::ios::binary | std::ios::app);
 
-    uint64_t ret = getFileSizeInBits(filename);
+    uint64_t ret = getFileSizeInByte(filename);
 
     if (ret == -1) {
         return ret;
@@ -74,25 +88,19 @@ uint64_t vLog::appendEntry(uint64_t key, const std::string &value) {
 }
 
 
-uint64_t vLog::getFileSizeInBits(const std::string &filePath) {
+uint64_t vLog::getFileSizeInByte(const std::string &filePath) {
     std::ifstream file(filePath, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
-        std::cerr << "无法打开文件：" << filePath << std::endl;
-        return -1; // 如果文件无法打开，返回错误值 -1
+        return 0;  // If file cannot be opened or does not exist, return 0
     }
-
-    // 获取文件大小（字节单位）
-    std::streamsize fileSize = file.tellg();
-    file.close(); // 关闭文件流
-
-    // 计算并返回文件大小（位单位）
-    return fileSize * 8;
+    return file.tellg();
 }
 
 uint64_t vLog::findFirstValidDataPosition(const std::string &filePath) {
     std::ifstream file(filePath, std::ios::binary);
+    file.seekg(0, std::ios::beg);  // 将文件指针移动到文件的开头
     if (!file.is_open()) {
-        std::cerr << "无法打开文件：" << filePath << std::endl;
+        std::cerr << "1无法打开文件：" << filePath << std::endl;
         return -1;
     }
 
@@ -106,23 +114,20 @@ uint64_t vLog::findFirstValidDataPosition(const std::string &filePath) {
     while (file.read(reinterpret_cast<char *>(&tempByte), 1)) {
         if (tempByte == expectedMagic) {
             std::vector<unsigned char> buffer; // 重新初始化buffer
-            buffer.push_back(tempByte); // 加入Magic byte
             if (!file.read(reinterpret_cast<char *>(&readChecksum), 2) ||
                 !file.read(reinterpret_cast<char *>(&key), 8) ||
                 !file.read(reinterpret_cast<char *>(&vlen), 4)) {
                 break;
             }
 
-            // 加入Key和vlen
-            buffer.insert(buffer.end(), reinterpret_cast<unsigned char *>(&readChecksum),
-                          reinterpret_cast<unsigned char *>(&readChecksum) + 2);
+
             buffer.insert(buffer.end(), reinterpret_cast<unsigned char *>(&key),
                           reinterpret_cast<unsigned char *>(&key) + 8);
             buffer.insert(buffer.end(), reinterpret_cast<unsigned char *>(&vlen),
                           reinterpret_cast<unsigned char *>(&vlen) + 4);
 
             // 读取Value
-            buffer.resize(buffer.size() + vlen);
+            buffer.resize(12 + vlen);
             if (!file.read(reinterpret_cast<char *>(buffer.data() + buffer.size() - vlen), vlen)) {
                 break;
             }
@@ -138,5 +143,11 @@ uint64_t vLog::findFirstValidDataPosition(const std::string &filePath) {
     }
 
     file.close();
-    return -1;
+    return getFileSizeInByte(filename);
+}
+
+int vLog::reset() {
+    utils::rmfile(filename);
+    head = 0;
+    tail = 0;
 }

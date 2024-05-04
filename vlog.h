@@ -15,12 +15,14 @@ private:
     std::string filename;
     uint64_t head;
     uint64_t tail;
-    uint64_t getFileSizeInBits(const std::string& filePath);
-    uint64_t findFirstValidDataPosition(const std::string& filePath);
+    uint64_t getFileSizeInByte(const std::string& filePath);
+
 public:
     vLog(const std::string &filename);
     ~vLog();
     uint64_t appendEntry(uint64_t key, const std::string &value);
+    uint64_t findFirstValidDataPosition(const std::string& filePath);
+    int reset();
 };
 
 #endif // VLOG_H
