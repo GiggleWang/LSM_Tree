@@ -144,4 +144,37 @@ uint64_t SSTindex::getKeyOrLargerIndexByKey(uint64_t key) {
     return findIndex;
 }
 
+uint64_t SSTindex::getKeyIndexByKey(uint64_t key) {
+    if (indexVec.size() == 0)
+        return UINT64_MAX;
+    if (key < indexVec[0].key)
+        return UINT64_MAX;
+    if (key > indexVec[indexVec.size() - 1].key)
+        return UINT64_MAX;
+    uint64_t left = 0;
+    uint64_t right =  indexVec.size() - 1;
+    uint64_t mid;
+    uint64_t findIndex = 0;
+    bool ifFind = false;
+    while(left <= right){
+        mid = left + ((right - left) / 2);
+        if(indexVec[mid].key == key){
+            findIndex = mid;
+            ifFind = true;
+            break;
+        }
+        else if(indexVec[mid].key > key){
+            right = mid - 1;
+        }
+        else if(indexVec[mid].key < key){
+            left = mid + 1;
+        }
+    }
+
+    if(ifFind)
+        return findIndex;
+    else
+        return UINT64_MAX;
+}
+
 

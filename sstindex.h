@@ -53,6 +53,9 @@ public:
 
     //根据key找到大于等于key的值的index
     uint64_t getKeyOrLargerIndexByKey(uint64_t key);
+
+    //根据key查找index
+    uint64_t getKeyIndexByKey(uint64_t key);
 };
 
 

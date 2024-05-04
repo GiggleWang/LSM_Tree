@@ -285,5 +285,35 @@ void SSTable::scan(uint64_t key1, uint64_t key2,
     }
 }
 
+bool SSTable::checkIfKeyExist(uint64_t targetKey) {
+    bool savedCachePolicy[3];
+    this->saveCachePolicy(savedCachePolicy);
+
+    if (targetKey > getHeaderPtr()->maxKey || targetKey < getHeaderPtr()->minKey) {
+        this->refreshCachePolicy(savedCachePolicy);
+        return false;
+    }
+
+    if (this->cachePolicy[1] == true) {
+        bool retVal = getBloomFilterPtr()->find(targetKey);
+        this->refreshCachePolicy(savedCachePolicy);
+        return retVal;
+    }
+
+    this->refreshCachePolicy(savedCachePolicy);
+    return true;
+}
+
+uint64_t SSTable::getKeyIndexByKey(uint64_t key) {
+    bool savedCachePolicy[3];
+    this->saveCachePolicy(savedCachePolicy);
+
+    uint64_t retVal = getIndexPtr()->getKeyIndexByKey(key);
+
+    this->refreshCachePolicy(savedCachePolicy);
+
+    return retVal;
+}
+
 
 

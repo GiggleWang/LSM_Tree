@@ -1,4 +1,5 @@
 #pragma once
+
 #include <string>
 
 #define logFilePath "./WAL.log"
@@ -13,10 +14,13 @@
 
 #define memtable_not_exist "~![ERROR] MemTable No Exist!~"
 
-#define memtable_not_found ""
+#define sstable_outOfRange "~![ERROR] Exceed Limit!~"
 
 #define memtable_already_deleted "~![ERROR] ALREADY DELETED!~"
 
+#define file_cannot_open "~![ERROR] FILE CANNOT OPEN!~"
+
+#define read_data_error "~![ERROR] READ DATA ERROR!~"
 #define sstable_maxSize 16 * 1024
 
 const bool Tiering = 0;
@@ -31,8 +35,7 @@ const std::string confFilePath = "./default.conf";
 #define sstable_fileOffset_bf 32
 
 #define sstable_fileOffset_key 8224
-enum operationID
-{
+enum operationID {
     PUT,
     DELETE
 };

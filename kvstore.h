@@ -10,7 +10,6 @@
 #include <chrono>
 class KVStore : public KVStoreAPI
 {
-	// You can add your implementation here
 private:
 	// 数据的目录
 	std::string dataDir;

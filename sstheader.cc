@@ -6,8 +6,9 @@
  * @param offset 要读取的偏移量，默认为0
 */
 SSTheader::SSTheader(std:: string path, uint32_t offset){
-    if(readFile(path, offset)!=0)
-        std::cout << "[Error] 崩溃！无法创建header\n";
+    int result=readFile(path, offset);
+    if(result!=0)
+        std::cout << "[Error] 崩溃！无法创建header"<<result<<std::endl;
 }
 
 

@@ -62,6 +62,9 @@ public:
 
     uint64_t getKeyOrLargerIndexByKey(uint64_t key);
 
+    uint64_t getKeyIndexByKey(uint64_t key);
+
     void scan(uint64_t key1, uint64_t key2, std::map<uint64_t, std::map<uint64_t,std::map< uint64_t, uint32_t>>> &scanMap);
 
+    bool checkIfKeyExist(uint64_t targetKey);
 };

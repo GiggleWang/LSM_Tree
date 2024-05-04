@@ -104,7 +104,7 @@ uint64_t vLog::findFirstValidDataPosition(const std::string &filePath) {
         return -1;
     }
 
-    const uint8_t expectedMagic = 0xff;
+    const uint8_t expectedMagic = MagicByte;
     uint16_t readChecksum, calculatedChecksum;
     uint64_t key;
     uint32_t vlen;
@@ -150,4 +150,31 @@ int vLog::reset() {
     utils::rmfile(filename);
     head = 0;
     tail = 0;
+}
+
+std::string vLog::findValueByOffsetAndVlen(uint64_t offset, uint32_t vlen) {
+    std::ifstream file(filename, std::ios::binary);  // 以二进制模式打开文件
+    if (!file.is_open()) {
+        std::cerr << "无法打开文件：" << filename << std::endl;
+        return file_cannot_open;  // 用于错误处理的字符串常量
+    }
+
+    // 移动到offset + 15位置
+    file.seekg(offset + 15, std::ios::beg);
+    if (file.fail()) {
+        std::cerr << "定位文件位置失败" << std::endl;
+        return "seek_error";
+    }
+
+    // 读取vlen个字节
+    std::string data;
+    data.resize(vlen);  // 预分配字符串大小
+    file.read(&data[0], vlen);  // 读取数据
+    if (file.fail() && !file.eof()) {
+        std::cerr << "读取数据失败" << std::endl;
+        return read_data_error;
+    }
+
+    file.close();  // 关闭文件
+    return data;   // 返回读取到的数据
 }

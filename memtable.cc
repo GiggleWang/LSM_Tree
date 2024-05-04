@@ -31,7 +31,7 @@ std::string MemTable::get(uint64_t key) {
             return memtable_already_deleted;
         return result;
     }
-    return memtable_not_found;
+    return memtable_not_exist;
 }
 
 
