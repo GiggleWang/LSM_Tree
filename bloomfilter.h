@@ -3,147 +3,156 @@
 #include <string>
 #include <iostream>
 #include <fstream>
-#include "MurmurHash3.h" // 确保有MurmurHash3的实现
+#include "MurmurHash3.h"
 
-// 布隆过滤器的大小，单位是字节
-constexpr size_t BloomFilterSize = 8192;
-
-// K 是键的类型
-template <typename K>
-class BloomFilter
-{
+// K 是键的类型，Size是BF过滤器占用的空间（单位是Byte）
+template<typename K, size_t Size>
+class BloomFilter{
 private:
-    // 用于存储的位图，大小为8kB * 8位 = 65536位
-    std::bitset<BloomFilterSize * 8> bloomFilterData;
+    // 用于存储的位图
+    std::bitset<Size * 8> bloomFilterData;
 
 public:
     // 插入元素
-    void insert(const K &key);
-    // 检查元素是否存在
-    bool find(const K &key) const;
+    void insert(K key);
+    // 检查元素是否存储
+    bool find(K key);
 
     // 读取文件，从文件获取数据（path是路径，offset是文件偏移量，单位是Byte）
     int readFile(std::string path, uint32_t offset);
     // 写入文件，把数据写入到文件（path是路径，offset是文件偏移量，单位是Byte）
     uint32_t writeToFile(std::string path, uint32_t offset);
 
-    // 构造函数和析构函数
-    BloomFilter() {}
-    ~BloomFilter() {}
+    // 构造函数 析构函数类型
+    BloomFilter(){}
+    ~BloomFilter(){}
 
-    BloomFilter(const std::string &path, uint32_t offset);
+    BloomFilter(std::string path, uint32_t offset);
 };
 
-template <typename K>
-BloomFilter<K>::BloomFilter(const std::string &path, uint32_t offset)
-{
+
+
+template<typename K, size_t Size>
+BloomFilter<K,Size>::BloomFilter(std::string path, uint32_t offset){
     readFile(path, offset);
 }
 
-template <typename K>
-void BloomFilter<K>::insert(const K &key)
-{
+
+
+/**
+ * 往BF过滤器里面插入元素
+ * @param Key 要插入的目标Key
+ */
+template<typename K, size_t Size>
+void BloomFilter<K,Size>::insert(K key){
+    // 如果已经创建，那就继续写入
+    // 计算四个hash值
     unsigned int hash[4] = {0};
     MurmurHash3_x64_128(&key, sizeof(key), 1, hash);
-    for (int i = 0; i < 4; ++i)
-    {
-        // 取余保证结果落在布隆过滤器大小内
-        bloomFilterData.set(hash[i] % (BloomFilterSize * 8), true);
+    this->bloomFilterData.set(0,1);
+    // 设置BF过滤器！
+    for(int i = 0; i < 4; i++){
+        this->bloomFilterData.set(hash[i] % (Size * 8) , true);
     }
 }
 
-template <typename K>
-bool BloomFilter<K>::find(const K &key) const
-{
+
+/**
+ * 根据BF过滤器，查找是否已经写入
+ * @param key 要查找的目标Key
+ * @return 是否存在在BF过滤器，存在返回 1 ，不存在返回 0
+ */
+template<typename K, size_t Size>
+bool BloomFilter<K,Size>::find(K key){
     unsigned int hash[4] = {0};
     MurmurHash3_x64_128(&key, sizeof(key), 1, hash);
-    for (int i = 0; i < 4; ++i)
-    {
-        if (!bloomFilterData.test(hash[i] % (BloomFilterSize * 8)))
-        {
-            return false; // 任一位不为1则表示不可能存在
-        }
+    for(int i = 0; i < 4; i++){
+        if(this->bloomFilterData.test(hash[i] % (Size * 8) ) == false)
+            return false;
     }
-    return true; // 所有位都为1可能存在
+    return true;
 }
 
+/**
+ * 把位图的数据写入到文件里面
+ * @param path 文件的路径
+ * @param offset 要读取的偏移量
+ * @return 0代表正常返回，-1代表文件不存在 -2代表范围异常
+ */
+template<typename K, size_t Size>
+int BloomFilter<K,Size>::readFile(std::string path, uint32_t offset){
+    std::ifstream inFile(path, std::ios::in|std::ios::binary);
 
-template<typename K>
-int BloomFilter<K>::readFile(std::string path, uint32_t offset) {
-    std::ifstream inFile(path, std::ios::in | std::ios::binary);
-    if (!inFile) {
+    if (!inFile)
         return -1;
-    }
 
     // 文件指针移动到末尾
-    inFile.seekg(0, std::ios::end);
-    uint32_t fileLimit = static_cast<uint32_t>(inFile.tellg());
+    inFile.seekg(0,std::ios::end);
+    uint32_t fileLimit = inFile.tellg();
 
     // 判断是否超过限度
-    if (offset > fileLimit || BloomFilterSize + offset > fileLimit) {
+    if(offset > fileLimit || Size + offset > fileLimit){
         inFile.close();
         return -2;
     }
 
     inFile.clear();
-    inFile.seekg(offset, std::ios::beg);
 
-    // 创建一个临时的字符缓冲区用于读取位图数据
-    std::vector<char> buffer(BloomFilterSize, 0);
-    inFile.read(buffer.data(), BloomFilterSize);
+    // 通过检查，文件指针移动到偏移量
+    inFile.seekg(offset,std::ios::beg);
 
-    // 将缓冲区的内容加载到bloomFilterData中
-    for (size_t i = 0; i < buffer.size(); ++i) {
-        for (int j = 0; j < 8; ++j) {
-            if (buffer[i] & (1 << j)) {
-                bloomFilterData.set(i * 8 + j);
-            }
-        }
-    }
-
+    inFile.read((char*)&bloomFilterData, Size);
     inFile.close();
     return 0;
 }
 
-template<typename K>
-uint32_t BloomFilter<K>::writeToFile(std::string path, uint32_t offset) {
+
+/**
+ * 把位图的数据写入到文件里面
+ * @param path 文件的路径
+ * @param offset 要写入的偏移量
+ * @return 返回文件写入的偏移量（Byte）
+ */
+template<typename K, size_t Size>
+uint32_t BloomFilter<K,Size>::writeToFile(std::string path, uint32_t offset){
     // 判断文件是否存在，用尝试读取的方式打开，如果打开成功就认为文件存在
     bool ifFileExist = false;
-    std::ifstream inFile(path, std::ios::in | std::ios::binary);
-    if (inFile) {
+    uint32_t fileLimit = 0;
+    std::ifstream inFile(path, std::ios::in|std::ios::binary);
+
+    if (inFile){
         // 打开成功，获取文件大小
-        inFile.seekg(0, std::ios::end);
-        ifFileExist = true;
+        inFile.seekg(0,std::ios::end);
+        fileLimit = inFile.tellg();
         inFile.close();
+        ifFileExist = true;
     }
 
-    // 如果文件不存在或用户设置的偏移量超出文件大小，重置偏移量
-    std::fstream outFile;
-    if (!ifFileExist || offset > BloomFilterSize) {
-        outFile.open(path, std::ios::out | std::ios::binary);
+    // 文件不存在
+    if(!ifFileExist){
         offset = 0;
-    } else {
-        outFile.open(path, std::ios::out | std::ios::in | std::ios::binary);
+        // 创建文件
+        std::fstream createFile(path, std::ios::out | std::ios::binary);
+        createFile.close();
+    }
+        // 文件存在且用户设置的偏移量大于文件最大的范围，以追加形式写入文件
+    else if(ifFileExist && (offset > fileLimit)){
+        offset = fileLimit;
     }
 
-    if (!outFile) {
+    std::fstream outFile(path, std::ios::out | std::ios::in | std::ios::binary);
+
+    if (!outFile)
         return -1;
-    }
+
 
     // 文件指针移动到偏移量
-    outFile.seekp(offset, std::ios::beg);
+    outFile.seekp(offset,std::ios::beg);
 
-    // 创建一个临时的字符缓冲区用于写入位图数据
-    std::vector<char> buffer(BloomFilterSize, 0);
-    for (size_t i = 0; i < BloomFilterSize * 8; ++i) {
-        if (bloomFilterData.test(i)) {
-            buffer[i / 8] |= (1 << (i % 8));
-        }
-    }
-
-    // 写入位图数据到文件
-    outFile.write(buffer.data(), BloomFilterSize);
+    // 开始写入文件
+    outFile.write((char*)&bloomFilterData, Size);
     outFile.close();
+
 
     return offset;
 }

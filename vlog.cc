@@ -16,14 +16,14 @@ vLog::vLog(const std::string &filename) : filename(filename), head(0), tail(0) {
 
     uint64_t fileLength = getFileSizeInByte(filename);
     if (fileLength == 0) {
-        std::cout << "New file created: " << filename << std::endl;
+//        std::cout << "New file created: " << filename << std::endl;
         head = fileLength;
         tail = findFirstValidDataPosition(filename);
-        std::cout << "head = " << head << " tail = " << tail << std::endl;
+//        std::cout << "head = " << head << " tail = " << tail << std::endl;
     } else {
         head = fileLength;
         tail = findFirstValidDataPosition(filename);
-        std::cout << "head = " << head << " tail = " << tail << std::endl;
+//        std::cout << "head = " << head << " tail = " << tail << std::endl;
     }
     file.close();  // Make sure to close the file
 }

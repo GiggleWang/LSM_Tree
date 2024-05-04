@@ -51,6 +51,8 @@ public:
     //根据index查找vlen
     uint32_t getVlenByIndex(uint64_t index);
 
+    //根据key找到大于等于key的值的index
+    uint64_t getKeyOrLargerIndexByKey(uint64_t key);
 };
 
 
