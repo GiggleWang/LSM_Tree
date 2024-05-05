@@ -29,7 +29,7 @@ void KVStore::put(uint64_t key, const std::string &s) {
         this->memTable->put(key, s);
         return;
     }
-    // std::cout <<key<< "开始写入磁盘 \n";
+//    std::cout << key << "开始写入磁盘 \n";
     // 插入检查失败。发起写入内存
     // 从内存表里面拷贝数据
     std::list<std::pair<uint64_t, std::string> > dataAll;
@@ -60,7 +60,13 @@ void KVStore::put(uint64_t key, const std::string &s) {
     ssTableIndex[0][msTime.count()] = newSStable;
     // 内存表格重置
     this->memTable->reset();
+    // 发起归并检查，递归执行
+    int checkResult = this->mergeCheck();
 
+    while (checkResult != -1) {
+        this->merge(checkResult);
+        checkResult = this->mergeCheck();
+    }
     this->memTable->put(key, s);
 
 }
@@ -188,19 +194,19 @@ void KVStore::scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, s
             tmpTimeStamp = timeStampFinal;
             tmpValue = value;
         }
-        if(tmpValue!=""){
-            mergeList[keyFinal]=tmpValue;
+        if (tmpValue != "") {
+            mergeList[keyFinal] = tmpValue;
         }
     }
 
     std::map<uint64_t, std::string> memList;
     this->memTable->scan(key1, key2, memList);
     for (const auto &outer_pair: memList) {
-        mergeList[outer_pair.first]=outer_pair.second;
+        mergeList[outer_pair.first] = outer_pair.second;
     }
 
     // 把结果返回
-    for(auto iter = mergeList.begin(); iter != mergeList.end(); iter++){
+    for (auto iter = mergeList.begin(); iter != mergeList.end(); iter++) {
         list.push_back({iter->first, iter->second});
     }
 
@@ -283,6 +289,20 @@ void KVStore::sstFileCheck(std::string dataPath) {
             ssTableIndex[iter->first][fileIDNum] = newTable;
         }
     }
+
+}
+
+int KVStore::mergeCheck() {
+    for(auto iterX = ssTableIndex.begin(); iterX != ssTableIndex.end(); iterX ++){
+        // iterX->second.size() 代表当前楼层的文件数量
+        // iterX->first 代表当前的楼层
+        if(config_level_limit[iterX->first] < iterX->second.size())
+            return iterX->first;
+    }
+    return -1;
+}
+
+void KVStore::merge(uint64_t X) {
 
 }
 

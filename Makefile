@@ -20,4 +20,7 @@ persistence: persistence.o $(OBJS)
 
 clean:
 	-rm -f $(EXECS) *.o
+	-rm -f ./data/level-*/*.sst
+	-rm -f ./WAL.log
+	-rm -f ./data/vlog
 

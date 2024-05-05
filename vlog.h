@@ -24,7 +24,7 @@ public:
     uint64_t appendEntry(uint64_t key, const std::string &value);
     uint64_t findFirstValidDataPosition(const std::string& filePath);
     std::string findValueByOffsetAndVlen(uint64_t offset,uint32_t vlen);
-    int reset();
+    void reset();
 };
 
 #endif // VLOG_H

@@ -73,7 +73,7 @@ uint32_t SSTindex::writeToFile(std::string path, uint32_t offset) {
     outFile.seekp(offset, std::ios::beg);
 
     // 开始写入文件
-    for (int i = 0; i < indexVec.size(); ++i) {
+    for (size_t i = 0; i < indexVec.size(); ++i) {
         outFile.write((char *) &(indexVec[i].key), sizeof(uint64_t));
         outFile.write((char *) &(indexVec[i].offset), sizeof(uint64_t));
         outFile.write((char *) &(indexVec[i].vlen), sizeof(uint32_t));
@@ -124,19 +124,17 @@ uint64_t SSTindex::getKeyOrLargerIndexByKey(uint64_t key) {
     if (key > indexVec[indexVec.size() - 1].key)
         return UINT64_MAX;
     uint64_t left = 0;
-    uint64_t right =  indexVec.size() - 1;
+    uint64_t right = indexVec.size() - 1;
     uint64_t mid;
     uint64_t findIndex = 0;
-    while(left <= right){
+    while (left <= right) {
         mid = left + ((right - left) / 2);
-        if(indexVec[mid].key == key){
+        if (indexVec[mid].key == key) {
             findIndex = mid;
             break;
-        }
-        else if(indexVec[mid].key > key){
+        } else if (indexVec[mid].key > key) {
             right = mid - 1;
-        }
-        else if(indexVec[mid].key < key){
+        } else if (indexVec[mid].key < key) {
             left = mid + 1;
             findIndex = left;
         }
@@ -152,26 +150,24 @@ uint64_t SSTindex::getKeyIndexByKey(uint64_t key) {
     if (key > indexVec[indexVec.size() - 1].key)
         return UINT64_MAX;
     uint64_t left = 0;
-    uint64_t right =  indexVec.size() - 1;
+    uint64_t right = indexVec.size() - 1;
     uint64_t mid;
     uint64_t findIndex = 0;
     bool ifFind = false;
-    while(left <= right){
+    while (left <= right) {
         mid = left + ((right - left) / 2);
-        if(indexVec[mid].key == key){
+        if (indexVec[mid].key == key) {
             findIndex = mid;
             ifFind = true;
             break;
-        }
-        else if(indexVec[mid].key > key){
+        } else if (indexVec[mid].key > key) {
             right = mid - 1;
-        }
-        else if(indexVec[mid].key < key){
+        } else if (indexVec[mid].key < key) {
             left = mid + 1;
         }
     }
 
-    if(ifFind)
+    if (ifFind)
         return findIndex;
     else
         return UINT64_MAX;

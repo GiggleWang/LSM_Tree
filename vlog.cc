@@ -37,9 +37,9 @@ uint64_t vLog::appendEntry(uint64_t key, const std::string &value) {
 
     uint64_t ret = getFileSizeInByte(filename);
 
-    if (ret == -1) {
-        return ret;
-    }
+//    if (ret == -1) {
+//        return ret;
+//    }
 
     // Magic byte
     const std::uint8_t Magic = this->MagicByte;
@@ -146,7 +146,7 @@ uint64_t vLog::findFirstValidDataPosition(const std::string &filePath) {
     return getFileSizeInByte(filename);
 }
 
-int vLog::reset() {
+void vLog::reset() {
     utils::rmfile(filename);
     head = 0;
     tail = 0;
