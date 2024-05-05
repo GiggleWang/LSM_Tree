@@ -230,6 +230,5 @@ int main(int argc, char *argv[])
 	CorrectnessTest test("./data", "./data/vlog", verbose);
 
 	test.start_test();
-
 	return 0;
 }
