@@ -32,6 +32,7 @@ const std::string confFilePath = "./default.conf";
 
 #define sstable_fileOffset_header 0
 
+
 #define sstable_fileOffset_bf 32
 
 #define sstable_fileOffset_key 8224

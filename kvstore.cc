@@ -2,7 +2,9 @@
 
 bool cachePolicy[3] = {true, true, true};
 
-
+//bool cachePolicy[3] = {true, true, false};
+//bool cachePolicy[3] = {true, false,false};
+//bool cachePolicy[3] = {false, false, false};
 KVStore::KVStore(const std::string &dir, const std::string &vlogDir) : KVStoreAPI(dir, vlogDir) {
     // 初始化目录和已有的最大时间戳
     this->dataDir = dir;
@@ -141,6 +143,7 @@ bool KVStore::del(uint64_t key) {
 void KVStore::reset() {
     utils::rmfile(logFilePath);
     this->memTable->reset();
+//    std::cout << "删除" << std::endl;
     // 再针对文件index，一个一个删除
     for (auto iterX = ssTableIndex.begin(); iterX != ssTableIndex.end(); iterX++) {
         for (auto iterY = ssTableIndex[iterX->first].begin(); iterY != ssTableIndex[iterX->first].end(); iterY++) {
@@ -212,7 +215,6 @@ void KVStore::scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, s
 
 
 }
-
 
 
 void KVStore::readConfig(std::string path) {
@@ -478,46 +480,195 @@ void KVStore::merge(uint64_t X) {
         }
     }
 // 如果缓存区域还有数据，继续进行sstable构建
-    if(list.size() > 0){
+    if (list.size() > 0) {
         // 时间戳获取
         std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
         std::chrono::microseconds msTime;
         msTime = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch());
 
-        std::string newFilePath = this->dataDir + "/level-" + std::to_string(X+1) + "/" + std::to_string(msTime.count()) +".sst";
+        std::string newFilePath =
+                this->dataDir + "/level-" + std::to_string(X + 1) + "/" + std::to_string(msTime.count()) + ".sst";
 
-        SSTable* newSStable = new SSTable(finalWriteFileTimeStamp, list, newFilePath, cachePolicy);
-        this->ssTableIndex[X+1][msTime.count()] = newSStable;
+        SSTable *newSStable = new SSTable(finalWriteFileTimeStamp, list, newFilePath, cachePolicy);
+        this->ssTableIndex[X + 1][msTime.count()] = newSStable;
 
         list.clear();
         listSSTfileSize = sstable_headerSize + sstable_bfSize;
     }
 
-    for(auto iterX = ssTableSelect.begin(); iterX != ssTableSelect.end(); iterX++){
+    for (auto iterX = ssTableSelect.begin(); iterX != ssTableSelect.end(); iterX++) {
         // iterY->first 对应 时间戳
         // iterY->second 对应指针
-        for(auto iterY = ssTableSelect[iterX->first].begin(); iterY != ssTableSelect[iterX->first].end(); iterY++){
+        for (auto iterY = ssTableSelect[iterX->first].begin(); iterY != ssTableSelect[iterX->first].end(); iterY++) {
             // 先删除文件
-            SSTable * tableCur = iterY->second;
+            SSTable *tableCur = iterY->second;
             tableCur->clear();
 
-            if(tableCur != NULL)
+            if (tableCur != NULL)
                 delete tableCur;
-            if(ssTableIndex[iterX->first].count(iterY->first) == 1){
+            if (ssTableIndex[iterX->first].count(iterY->first) == 1) {
                 ssTableIndex[iterX->first].erase(iterY->first);
             }
         }
     }
 }
 
+void setZeroInFile(std::string filename, uint64_t offset, uint64_t len) {
+    // 打开文件以读写模式，并以二进制模式进行操作
+    std::fstream file(filename, std::ios::in | std::ios::out | std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return;
+    }
 
+    // 移动到指定的偏移量
+    file.seekp(offset, std::ios::beg);
+    if (!file) {
+        std::cerr << "Error seeking to offset: " << offset << std::endl;
+        file.close();
+        return;
+    }
 
+    // 准备长度为len的零字节数组
+    std::vector<char> zeroBytes(len, 0);
 
+    // 写入零字节
+    file.write(zeroBytes.data(), len);
+    if (!file) {
+        std::cerr << "Error writing zero bytes to file" << std::endl;
+    }
+
+    // 关闭文件
+    file.close();
+}
 
 /**
  * This reclaims space from vLog by moving valid value and discarding invalid value.
  * chunk_size is the size in byte you should AT LEAST recycle.
  */
 void KVStore::gc(uint64_t chunk_size) {
+    std::string filename = vlog->getFileName();
+    uint64_t tail = vlog->getTail();
+
+    uint8_t magic;
+    uint16_t checksum;
+    uint64_t key;
+    uint32_t vlen;
+    std::string value;
+    uint64_t searchedSize = 0;
+    uint64_t offset = vlog->getTail();
+    std::ifstream file(filename, std::ios::binary);  // 以二进制模式打开文件
+//    std::cout<<"                               begin while ...\n";
+    while (searchedSize < chunk_size) {
+        // 移动到offset位置
+        file.seekg(offset, std::ios::beg);
+        if (!file.is_open()) {
+            std::cerr << "无法打开文件：" << filename << std::endl;
+            return;
+        }
+        if (!file.read(reinterpret_cast<char *>(&magic), 1) ||
+            !file.read(reinterpret_cast<char *>(&checksum), 2) ||
+            !file.read(reinterpret_cast<char *>(&key), 8) ||
+            !file.read(reinterpret_cast<char *>(&vlen), 4)) {
+            std::cout << read_data_error << "1" << std::endl;
+            return;
+        }
+        if (magic != 0xff) {
+            std::cout << read_data_error << "2" << std::endl;
+            return;
+        }
+        value.resize(vlen); // 调整字符串的容量以匹配将要读取的数据大小
+        if (!file.read(&value[0], vlen)) {
+            std::cout << read_data_error << "3" << std::endl;
+            return;
+        }
+//        vlog->refresh();
+        //如果在memtable中，那么回收
+        //如果在表中查到，并且offset不是这里，那么回收
+        //如果在表中查到，并且offset在这里，那么插入memtable
+        if (this->memTable->get(key) != memtable_not_exist) {
+            searchedSize += (15 + vlen);
+            offset += (15 + vlen);
+            continue;
+        }
+        //在ssttable里面找
+        uint64_t trueOffset = this->getOffsetByKey(key);
+        if (trueOffset != offset) {
+//            std::cout << "trueOffset " << trueOffset << " offset: " << offset << std::endl;
+            searchedSize += (1 + 2 + 8 + 4 + vlen);
+            offset += (1 + 2 + 8 + 4 + vlen);
+            continue;
+        }
+        //下面说明确实是在这里
+        this->put(key, value);
+        searchedSize += (1 + 2 + 8 + 4 + vlen);
+        offset += (1 + 2 + 8 + 4 + vlen);
+    }
+//    std::cout<<"                               end while ...\n";
+    //扫描完成，如果memtable还有数据，那么还要再进行一下组装sstable
+    std::list<std::pair<uint64_t, std::string> > list;
+    this->memTable->copyAll(list);
+    if (!list.empty()) {
+        // 时间戳获取
+        std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+        std::chrono::microseconds msTime;
+        msTime = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch());
+        // 文件创建 [文件名称规则，为防止重复，用的时间戳作为文件名]
+        this->sstMaxTimeStamp = this->sstMaxTimeStamp + 1;
+        std::string newFilePath = this->dataDir + "/level-0/" + std::to_string(msTime.count()) + ".sst";
+        /*
+         * 将得到的dataAll分为两部分
+         * 一部分是std::list<std::tuple<uint64_t, uint64_t, uint32_t>>
+         *      即<key offset vlen>
+         * 另一部分是value（直接插入即可)
+         * */
+        std::list<std::tuple<uint64_t, uint64_t, uint32_t>> data;
+        for (const auto &element: list) {
+            uint64_t keyInsert = element.first;
+            std::string valueInsert = element.second;
+            uint32_t vlenInsert = valueInsert.size();
+            uint64_t offsetInsert = vlog->appendEntry(keyInsert, valueInsert);
+            data.push_back(std::make_tuple(keyInsert, offsetInsert, vlenInsert));
+        }
+        SSTable *newSStable = new SSTable(sstMaxTimeStamp, data, newFilePath, cachePolicy);
+        ssTableIndex[0][msTime.count()] = newSStable;
+        // 内存表格重置
+        this->memTable->reset();
+        // 发起归并检查，递归执行
+        int checkResult = this->mergeCheck();
+
+        while (checkResult != -1) {
+            this->merge(checkResult);
+            checkResult = this->mergeCheck();
+        }
+        for (const auto &element: list) {
+            this->put(element.first, element.second);
+        }
+
+
+    }
+//    std::cout<<"               start alloc...\n";
+    utils::de_alloc_file(filename, 0, searchedSize + tail);
+//    std::cout<<"               end  alloc...\n";
+    vlog->refresh(searchedSize + tail);
+}
+
+uint64_t KVStore::getOffsetByKey(uint64_t key) {
+    for (auto iterX = ssTableIndex.begin(); iterX != ssTableIndex.end(); iterX++) {
+        // 按照层查找，找到立马返回，
+        for (auto iterY = iterX->second.rbegin(); iterY != iterX->second.rend(); iterY++) {
+            SSTable *curSST = iterY->second;
+            // 检查是否可能存在
+            if (curSST->checkIfKeyExist(key)) {
+                uint64_t indexResult = curSST->getKeyIndexByKey(key);
+                // 不存在，下一个
+                if (indexResult == UINT64_MAX)
+                    continue;
+                uint64_t offsetResult = curSST->getSStableOffset(indexResult);
+                return offsetResult;
+            }
+        }
+    }
+    return UINT64_MAX;
 }
 

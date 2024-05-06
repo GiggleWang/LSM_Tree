@@ -5,6 +5,7 @@
 vLog::vLog(const std::string &filename) : filename(filename), head(0), tail(0) {
     std::fstream file(filename, std::ios::in | std::ios::out | std::ios::binary); // 尝试以读写模式打开文件
     if (!file.is_open()) { // 如果文件不存在或无法打开
+//        std::cout<<"新建"<<std::endl;
         file.open(filename, std::ios::out | std::ios::binary); // 以写模式打开以创建文件
         file.close(); // 关闭文件流
         file.open(filename, std::ios::in | std::ios::out | std::ios::binary); // 重新以读写模式打开
@@ -148,6 +149,13 @@ uint64_t vLog::findFirstValidDataPosition(const std::string &filePath) {
 
 void vLog::reset() {
     utils::rmfile(filename);
+    std::fstream file(filename, std::ios::in | std::ios::out | std::ios::binary); // 尝试以读写模式打开文件
+    if (!file.is_open()) { // 如果文件不存在或无法打开
+//        std::cout<<"新建"<<std::endl;
+        file.open(filename, std::ios::out | std::ios::binary); // 以写模式打开以创建文件
+        file.close(); // 关闭文件流
+        file.open(filename, std::ios::in | std::ios::out | std::ios::binary); // 重新以读写模式打开
+    }
     head = 0;
     tail = 0;
 }
@@ -155,7 +163,7 @@ void vLog::reset() {
 std::string vLog::findValueByOffsetAndVlen(uint64_t offset, uint32_t vlen) {
     std::ifstream file(filename, std::ios::binary);  // 以二进制模式打开文件
     if (!file.is_open()) {
-        std::cerr << "无法打开文件：" << filename << std::endl;
+        std::cerr << "2无法打开文件：" << filename << std::endl;
         return file_cannot_open;  // 用于错误处理的字符串常量
     }
 
@@ -178,3 +186,11 @@ std::string vLog::findValueByOffsetAndVlen(uint64_t offset, uint32_t vlen) {
     file.close();  // 关闭文件
     return data;   // 返回读取到的数据
 }
+
+void vLog::refresh(uint64_t size) {
+//    std::cout << "size = " << size << std::endl;
+//    this->tail = this->findFirstValidDataPosition(this->filename);
+//    std::cout << "tail = " << tail << std::endl;
+    this->tail = size;
+}
+

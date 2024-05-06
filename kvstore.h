@@ -57,4 +57,6 @@ public:
     int mergeCheck();
 
     void merge(uint64_t X);
+
+    uint64_t getOffsetByKey(uint64_t key);
 };
