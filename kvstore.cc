@@ -7,15 +7,21 @@ bool cachePolicy[3] = {true, true, true};
 //bool cachePolicy[3] = {false, false, false};
 KVStore::KVStore(const std::string &dir, const std::string &vlogDir) : KVStoreAPI(dir, vlogDir) {
     // 初始化目录和已有的最大时间戳
+//    std::cout<<"begin kvstore build...\n";
     this->dataDir = dir;
     this->sstMaxTimeStamp = 0;
+//    std::cout<<"end kvstore build...1\n";
     // 读取配置文件
     this->readConfig(confFilePath);
     // 根据配置文件执行文件检查，如果存在文件，就读取到缓存，刷新sstMaxTimeStamp
+//    std::cout<<"end kvstore build...2\n";
     this->sstFileCheck(dir);
+//    std::cout<<"end kvstore build...3\n";
     // 创建MemTable和vLog
     this->memTable = new MemTable();
+//    std::cout<<"end kvstore build...4\n";
     this->vlog = new vLog(vlogDir);
+//    std::cout<<"end kvstore build...\n";
 }
 
 KVStore::~KVStore() {

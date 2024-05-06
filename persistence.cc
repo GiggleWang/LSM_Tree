@@ -179,11 +179,10 @@ int main(int argc, char *argv[])
 	{
 		PersistenceTest test("./data", "./data/vlog", verbose);
 
-        std::cout<<"             start prepare...\n";
 		// The child process first prepared data for testing
 		test.prepare();
-        std::cout<<"             end prepare...\n";
-		// Wake up parent process to randomly sterminate child process
+
+		// Wake up parent process to randomly terminate child process
 		kill(getppid(), SIGUSR1);
 
 		test.loop();

@@ -3,29 +3,36 @@
 #include <fstream>
 
 vLog::vLog(const std::string &filename) : filename(filename), head(0), tail(0) {
+//    std::cout << "vlog build 1\n";
     std::fstream file(filename, std::ios::in | std::ios::out | std::ios::binary); // 尝试以读写模式打开文件
+//    std::cout << "vlog build 2\n";
     if (!file.is_open()) { // 如果文件不存在或无法打开
 //        std::cout<<"新建"<<std::endl;
         file.open(filename, std::ios::out | std::ios::binary); // 以写模式打开以创建文件
         file.close(); // 关闭文件流
         file.open(filename, std::ios::in | std::ios::out | std::ios::binary); // 重新以读写模式打开
     }
-
+//    std::cout << "vlog build 3\n";
     if (!file.is_open()) {
         throw std::runtime_error("Failed to open or create file: " + filename);
     }
-
+//    std::cout << "vlog build 4\n";
     uint64_t fileLength = getFileSizeInByte(filename);
+//    std::cout << "vlog build 5\n";
     if (fileLength == 0) {
 //        std::cout << "New file created: " << filename << std::endl;
+//        std::cout << "filelength = 0\n";
         head = fileLength;
-        tail = findFirstValidDataPosition(filename);
+        tail = 0;
+//        tail = findFirstValidDataPosition(filename);
 //        std::cout << "head = " << head << " tail = " << tail << std::endl;
     } else {
+//        std::cout << "filelength != 0\n";
         head = fileLength;
         tail = findFirstValidDataPosition(filename);
 //        std::cout << "head = " << head << " tail = " << tail << std::endl;
     }
+//    std::cout << "vlog build 6\n";
     file.close();  // Make sure to close the file
 }
 
@@ -113,6 +120,7 @@ uint64_t vLog::findFirstValidDataPosition(const std::string &filePath) {
     uint8_t tempByte;
 
     while (file.read(reinterpret_cast<char *>(&tempByte), 1)) {
+//        std::cout<<file.tellg()<<std::endl;
         if (tempByte == expectedMagic) {
             std::vector<unsigned char> buffer; // 重新初始化buffer
             if (!file.read(reinterpret_cast<char *>(&readChecksum), 2) ||
