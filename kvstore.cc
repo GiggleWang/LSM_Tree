@@ -1,10 +1,11 @@
 #include "kvstore.h"
 
-bool cachePolicy[3] = {true, true, true};
+//bool cachePolicy[3] = {true, true, true};
 
 //bool cachePolicy[3] = {true, true, false};
 //bool cachePolicy[3] = {true, false,false};
 //bool cachePolicy[3] = {false, false, false};
+bool cachePolicy[3] = {false, true, true};
 KVStore::KVStore(const std::string &dir, const std::string &vlogDir) : KVStoreAPI(dir, vlogDir) {
     // 初始化目录和已有的最大时间戳
 //    std::cout<<"begin kvstore build...\n";
