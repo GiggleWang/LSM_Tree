@@ -20,6 +20,10 @@ public:
     void getTest(bool print = true);
 
     void reset() { store->reset(); }
+
+    void mergeTest();
+
+    void prepareAQuarter();
 };
 
 myTest::myTest(std::string dir1, std::string dir2) {
@@ -33,6 +37,11 @@ void myTest::prepare() {
         store->put(i, std::string(i + 1, 's'));
     }
     std::cout << "end preparing for the initial data...\n";
+}
+void myTest::prepareAQuarter() {
+    for (uint64_t i = 0; i < number; i+=4) {
+        store->put(i, std::string(i + 1, 's'));
+    }
 }
 
 void myTest::putTest(bool print) {
@@ -80,6 +89,22 @@ void myTest::getTest(bool print) {
     }
 }
 
+
+void myTest::mergeTest() {
+    uint64_t maxNumber = 256 * 1024;
+    uint64_t division = 4 * 1024;
+    auto start = std::chrono::high_resolution_clock::now();  // 开始计时
+    for (uint64_t i = 0; i < maxNumber; i++) {
+        if (i % division == 0 && i != 0) {
+            auto end = std::chrono::high_resolution_clock::now();  // 结束计时
+            std::chrono::duration<double> elapsed = end - start;  // 计算总耗时
+            std::cout << "Total elapsed time of get from " << (i - division) << " to " << i << ": " << elapsed.count()
+                      << " seconds\n";
+            std::cout << "Throughput: " << division / elapsed.count() << " operations per second\n";
+        }
+    }
+}
+
 void test1() {
     myTest test("./data", "./data/vlog");
     test.prepare();
@@ -90,11 +115,29 @@ void test1() {
 
 void test2() {
     myTest test("./data", "./data/vlog");
-    std::cout << "Both cache the information of index and the bloom filter" << std::endl;
-    test.putTest(false);
+    std::cout << "Nothing is cached" << std::endl;
+//    std::cout << "Only cache the information of index" << std::endl;
+//    std::cout << "Both cache the information of index and bloom filter" << std::endl;
+    test.prepareAQuarter();
     test.getTest();
 }
 
+void test3() {
+    myTest test("./data", "./data/vlog");
+    test.mergeTest();
+}
+
+void test4_1(){
+    myTest test("./data", "./data/vlog");
+    test.prepareAQuarter();
+    test.getTest();
+}
+void test4_2(){
+    myTest test("./data", "./data/vlog");
+    test.prepareAQuarter();
+    test.putTest();
+}
 int main() {
-    test2();
+    test4_1();
+    test4_2();
 }
