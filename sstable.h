@@ -1,3 +1,4 @@
+// sstable.h
 #pragma once
 
 #include "sstheader.h"
@@ -32,11 +33,7 @@ private:
 
 public:
     void refreshCachePolicy(bool setCachePolicy[3]);
-
-    // 初始化一个SSTable, 从文件里面读取，并设置常态化缓存策略
     SSTable(std::string path, bool cachePolicy[3]);
-
-    // 初始化一个SStable，从list读数据写入，完成之后立即落硬盘
     SSTable(uint64_t setTimeStamp,
             std::list<std::tuple<uint64_t, uint64_t, uint32_t>> &dataList,
             std::string setPath, bool cachePolicy[3]);
@@ -45,7 +42,6 @@ public:
 
     void clear();
 
-    // 变量读取写在这里面
     uint64_t getSStableTimeStamp();
 
     uint64_t getSStableMinKey();
