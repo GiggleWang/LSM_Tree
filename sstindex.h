@@ -1,3 +1,4 @@
+//sstindex.h
 #ifndef LSM_TREE_SSTINDEX_H
 #define LSM_TREE_SSTINDEX_H
 
@@ -31,30 +32,22 @@ public:
 
     SSTindex(std::string path, uint32_t offset, size_t readKeyNum);
 
-    // 文件相关
     int readFile(std::string path, uint32_t offset, size_t readKeyNum);
 
     uint32_t writeToFile(std::string path, uint32_t offset);
 
-    //返回键值对的数量
-    uint64_t getKeyNum(){return indexVec.size();}
+    uint64_t getKeyNum() { return indexVec.size(); }
 
-    //插入indexStruct元
-    void insert(uint64_t newKey, uint64_t newOffset,uint32_t newVlen);
+    void insert(uint64_t newKey, uint64_t newOffset, uint32_t newVlen);
 
-    //根据index查找key
     uint64_t getKeyByIndex(uint64_t index);
 
-    //根据index查找offset
     uint64_t getOffsetByIndex(uint64_t index);
 
-    //根据index查找vlen
     uint32_t getVlenByIndex(uint64_t index);
 
-    //根据key找到大于等于key的值的index
     uint64_t getKeyOrLargerIndexByKey(uint64_t key);
 
-    //根据key查找index
     uint64_t getKeyIndexByKey(uint64_t key);
 };
 

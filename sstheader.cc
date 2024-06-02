@@ -1,3 +1,4 @@
+//sstheader.cc
 #include "sstheader.h"
 
 /**
@@ -5,14 +6,12 @@
  * @param path 文件路径 
  * @param offset 要读取的偏移量，默认为0
 */
-SSTheader::SSTheader(std:: string path, uint32_t offset){
-    int result=readFile(path, offset);
-    if(result!=0)
-        std::cout << "[Error] 崩溃！无法创建header"<<result<<std::endl;
+SSTheader::SSTheader(std::string filePath, uint32_t fileOffset) {
+    int readResult = readFile(filePath, fileOffset);
+    if (readResult != 0) {
+        std::cerr << "[Error] 崩溃！无法创建header" << readResult << std::endl;
+    }
 }
-
-
-
 /**
  * 从文件读取Header数据
  * @param path 文件的路径
@@ -20,36 +19,28 @@ SSTheader::SSTheader(std:: string path, uint32_t offset){
  * @return 0代表正常返回，-1代表文件不存在 -2代表范围异常
  * 使用样例：readFile("./data", 0);
  */
-int SSTheader::readFile(std::string path, uint32_t offset){
-    std::ifstream inFile(path, std::ios::in|std::ios::binary);
-    if (!inFile)
+int SSTheader::readFile(const std::string filePath, uint32_t fileOffset) {
+    std::ifstream inputFile(filePath, std::ios::in | std::ios::binary);
+    if (!inputFile)
         return -1;
+    inputFile.seekg(0, std::ios::end);
 
-    // 文件指针移动到末尾
-    inFile.seekg(0,std::ios::end);
-
-    uint32_t fileLimit = inFile.tellg();
-
-    // 判断是否超过限度 读取起点越界或者终点越界，都会返回-1
-    if(offset > fileLimit || offset + sizeof(SSTheader) > fileLimit){
-        inFile.close();
+    uint32_t fileSize = inputFile.tellg();
+    if (fileOffset > fileSize || fileOffset + sizeof(SSTheader) > fileSize) {
+        inputFile.close();
         return -2;
     }
+    inputFile.clear();
+    inputFile.seekg(fileOffset, std::ios::beg);
+    inputFile.read(reinterpret_cast<char*>(&timeStamp), sizeof(timeStamp));
+    inputFile.read(reinterpret_cast<char*>(&keyValNum), sizeof(keyValNum));
+    inputFile.read(reinterpret_cast<char*>(&minKey), sizeof(minKey));
+    inputFile.read(reinterpret_cast<char*>(&maxKey), sizeof(maxKey));
 
-    inFile.clear();
-
-    // 通过检查，文件指针移动到偏移量
-    inFile.seekg(offset,std::ios::beg);
-
-    // 读取文件
-    inFile.read((char*)&timeStamp, sizeof(timeStamp));
-    inFile.read((char*)&keyValNum, sizeof(keyValNum));
-    inFile.read((char*)&minKey, sizeof(minKey));
-    inFile.read((char*)&maxKey, sizeof(maxKey));
-
-    inFile.close();
+    inputFile.close();
     return 0;
 }
+
 
 
 /**
@@ -64,48 +55,37 @@ int SSTheader::readFile(std::string path, uint32_t offset){
  * 如果文件存在，会判断文件的大小，当offset < 文件大小的时候，才会覆盖性的写入，反之以追加模式写入文件
  * 调用者可以通过[返回值] 获取到实际写入的偏移量（Byte单位），-1(也就是一个最大的int32)说明是异常
  */
-uint32_t SSTheader::writeToFile(std::string path, uint32_t offset){
+uint32_t SSTheader::writeToFile(std::string path, uint32_t offset) {
     // 判断文件是否存在，用尝试读取的方式打开，如果打开成功就认为文件存在
-    bool ifFileExist = false;
-    uint32_t fileLimit = 0;
-    std::ifstream inFile(path, std::ios::in|std::ios::binary);
+    bool fileExists = false;
+    uint32_t fileSize = 0;
+    std::ifstream inputFile(path, std::ios::in | std::ios::binary);
 
-    if (inFile){
-        // 打开成功，获取文件大小
-        inFile.seekg(0,std::ios::end);
-        fileLimit = inFile.tellg();
-        inFile.close();
-        ifFileExist = true;
+    if (inputFile) {
+        inputFile.seekg(0, std::ios::end);
+        fileSize = inputFile.tellg();
+        inputFile.close();
+        fileExists = true;
     }
-
-    // 文件不存在
-    if(!ifFileExist){
+    if (!fileExists) {
         offset = 0;
-        // 创建文件
         std::fstream createFile(path, std::ios::out | std::ios::binary);
         createFile.close();
     }
-        // 文件存在且用户设置的偏移量大于文件最大的范围，以追加形式写入文件
-    else if(ifFileExist && (offset > fileLimit)){
-        offset = fileLimit;
+    else if (fileExists && (offset > fileSize)) {
+        offset = fileSize;
     }
 
-    std::fstream outFile(path, std::ios::out | std::ios::in | std::ios::binary);
+    std::fstream outputFile(path, std::ios::out | std::ios::in | std::ios::binary);
 
-    if (!outFile)
+    if (!outputFile)
         return -1;
+    outputFile.seekp(offset, std::ios::beg);
+    outputFile.write(reinterpret_cast<char*>(&timeStamp), sizeof(timeStamp));
+    outputFile.write(reinterpret_cast<char*>(&keyValNum), sizeof(keyValNum));
+    outputFile.write(reinterpret_cast<char*>(&minKey), sizeof(minKey));
+    outputFile.write(reinterpret_cast<char*>(&maxKey), sizeof(maxKey));
 
-    // 把文件指针移动到偏移量
-    outFile.seekp(offset,std::ios::beg);
-
-    // 开始写入文件
-    outFile.write((char*)&timeStamp, sizeof(timeStamp));
-    outFile.write((char*)&keyValNum, sizeof(keyValNum));
-    outFile.write((char*)&minKey, sizeof(minKey));
-    outFile.write((char*)&maxKey, sizeof(maxKey));
-
-    outFile.close();
+    outputFile.close();
     return offset;
 }
-
-
