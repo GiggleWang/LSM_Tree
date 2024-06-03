@@ -1,10 +1,10 @@
+//memtable.cc
 #include "memtable.h"
 
 MemTable::MemTable() {
     skiplist = new Skiplist<uint64_t, std::string>();
-    // 初始化占用的sst大小为 头部的header和bf过滤器的size
     sstSpaceSize = sstable_headerSize + sstable_bfSize;
-    this->restoreFromLog(logFilePath);
+    restoreFromLog(logFilePath);
 }
 
 MemTable::~MemTable() {
@@ -12,113 +12,98 @@ MemTable::~MemTable() {
     delete skiplist;
 }
 
-void MemTable::put(uint64_t key, const std::string &s) {
-    this->writeLog(logFilePath, PUT, key, s);
-    this->putKV(key, s);
+void MemTable::put(uint64_t key, const std::string &value) {
+    writeLog(logFilePath, PUT, key, value);
+    putKV(key, value);
 }
 
 bool MemTable::del(uint64_t key) {
-    this->writeLog(logFilePath, DELETE, key, "");
-    return this->delKV(key);
+    writeLog(logFilePath, DELETE, key, "");
+    return delKV(key);
 }
 
-std::string MemTable::get(uint64_t key) {
-    auto tryFindNode = this->skiplist->find(key);
-    if (tryFindNode != NULL) {
-        std::string result = tryFindNode->val;
-        // 检查result是否为删除标记
-        if (result == delete_tag)
+std::string MemTable::get(uint64_t searchKey) {
+    auto foundNode = skiplist->find(searchKey);
+    if (foundNode != nullptr) {
+        std::string value = foundNode->val;
+        if (value == delete_tag)
             return memtable_already_deleted;
-        return result;
+        return value;
     }
     return memtable_not_exist;
 }
 
-
 void MemTable::reset() {
     utils::rmfile(logFilePath);
-    // 重置之后，首先清空跳表数据
-    this->skiplist->clear();
-    // 然后把当前维护的转换到sst的大小计算出来
+    // 清空跳表数据
+    skiplist->clear();
+    // 重新计算当前维护的转换到 SST 的大小
     sstSpaceSize = sstable_headerSize + sstable_bfSize;
 }
 
-void MemTable::scan(uint64_t key1, uint64_t key2, std::map<uint64_t, std::string> &resultMap) {
-    Node<uint64_t, std::string> *iter = this->skiplist->find(key1);
-    // 如果key1不存在 那就手动插入一个 key 1然后再完成之后删除掉。
-    if (iter == NULL) {
-        iter = this->skiplist->insert(key1, "");
-        // 跳过自己，因为已经证实自己不存在
-        iter = iter->next[0];
+void MemTable::scan(uint64_t startKey, uint64_t endKey, std::map<uint64_t, std::string> &resultMap) {
+    Node<uint64_t, std::string> *currentNode = skiplist->find(startKey);
 
-        while (iter->type == nodeType_Data && iter->key <= key2) {
-            // 不要把已经删除了的数据插入
-            if (iter->val != delete_tag)
-                resultMap[iter->key] = iter->val;
-                // 删除的数据，必须强制抹掉！内存表时间优先级MAX！
-            else
-                resultMap.erase(iter->key);
-            iter = iter->next[0];
+    // 如果 startKey 不存在，插入一个临时节点并跳过自己
+    if (currentNode == nullptr) {
+        currentNode = skiplist->insert(startKey, "");
+        currentNode = currentNode->next[0];
+
+        while (currentNode->type == nodeType_Data && currentNode->key <= endKey) {
+            if (currentNode->val != delete_tag) {
+                resultMap[currentNode->key] = currentNode->val;
+            } else {
+                resultMap.erase(currentNode->key);
+            }
+            currentNode = currentNode->next[0];
         }
-        // 查找完成后记得把自己添加的元素删除
-        this->skiplist->remove(key1);
-    }
-        // 如果key1存在，那就正常查找
-    else {
-        // 增加检查是否为deleteTag！
-        if (iter->key == key1 && iter->val != delete_tag) {
-            resultMap[iter->key] = iter->val;
+        skiplist->remove(startKey);
+    } else {
+        if (currentNode->key == startKey && currentNode->val != delete_tag) {
+            resultMap[currentNode->key] = currentNode->val;
         }
-        iter = iter->next[0];
-        while (iter->type == nodeType_Data && iter->key <= key2) {
-            if (iter->val != delete_tag)
-                resultMap[iter->key] = iter->val;
-            iter = iter->next[0];
+        currentNode = currentNode->next[0];
+
+        while (currentNode->type == nodeType_Data && currentNode->key <= endKey) {
+            if (currentNode->val != delete_tag) {
+                resultMap[currentNode->key] = currentNode->val;
+            }
+            currentNode = currentNode->next[0];
         }
     }
 }
 
-void MemTable::writeLog(std::string path, operationID id, uint64_t key, std::string val) {
-    std::ofstream outFile(path, std::fstream::out | std::fstream::app);
+void MemTable::writeLog(const std::string filepath, operationID opID, uint64_t key,  std::string value) {
+    std::ofstream logFile(filepath, std::fstream::out | std::fstream::app);
 
-    switch (id) {
-        case PUT:
-            outFile << "PUT"
-                    << " " << key << " " << val << "\n";
-            break;
-        case DELETE:
-            outFile << "DEL"
-                    << " " << key << "\n";
-            break;
-        default:
-            break;
+    if (opID == PUT) {
+        logFile << "PUT" << " " << key << " " << value << "\n";
+    } else if (opID == DELETE) {
+        logFile << "DEL" << " " << key << "\n";
     }
 
-    outFile.close();
+    logFile.close();
 }
 
-void MemTable::putKV(uint64_t key, const std::string &s) {
-    // 插入节点之前，先检查节点是否存在
-    Node<uint64_t, std::string> *tryFind = this->skiplist->find(key);
+void MemTable::putKV(uint64_t key, const std::string &value) {
+    Node<uint64_t, std::string> *foundNode = skiplist->find(key);
 
-    // 插入全新的key-value对，就需要把sstSpaceSize更新
-    if (tryFind == NULL) {
-        this->skiplist->insert(key, s);
+    if (foundNode == nullptr) {
+        skiplist->insert(key, value);
         sstSpaceSize += (sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t));
-    }
-        // 否则不需要更新sstSpaceSize
-    else {
-        this->skiplist->insert(key, s);
+    } else {
+        skiplist->insert(key, value);
     }
 }
 
 bool MemTable::delKV(uint64_t key) {
-    auto tryFind = this->skiplist->find(key);
-    if (tryFind == NULL)
+    auto foundNode = skiplist->find(key);
+    if (foundNode == nullptr) {
         return false;
-    // 占用的空间要减回去
+    }
+
     sstSpaceSize -= (sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t));
-    this->skiplist->remove(key);
+    skiplist->remove(key);
     return true;
 }
 
@@ -137,61 +122,54 @@ bool MemTable::delKV(uint64_t key) {
  * 函数首先打开文件，然后逐行读取操作。对于每一行，函数解析操作类型和键（以及值，如果有的话），
  * 并调用对应的 MemTable 方法来更新内存表的状态。
  */
-void MemTable::restoreFromLog(std::string path) {
-    std::ifstream inFile;
-    inFile.open(path);
+void MemTable::restoreFromLog(const std::string filepath) {
+    std::ifstream logFile(filepath);
 
-    std::string rowLog;
-    std::string operationType;
+    std::string logEntry;
+    std::string operation;
     uint64_t key;
-    std::string val;
-
-    // 如果配置文件存在，那就读取
-    if (inFile.is_open()) {
-        while (std::getline(inFile, rowLog)) {
-            std::vector<size_t> spaceIndex;
-
-            // 扫描空格的位置
-            for (size_t i = 0; i < rowLog.size(); i++) {
-                if (rowLog[i] == ' ') {
-                    spaceIndex.push_back(i);
+    std::string value;
+    if (logFile.is_open()) {
+        while (std::getline(logFile, logEntry)) {
+            std::vector<size_t> spacePositions;
+            for (size_t i = 0; i < logEntry.size(); ++i) {
+                if (logEntry[i] == ' ') {
+                    spacePositions.push_back(i);
                 }
-
-                if (spaceIndex.size() == 2)
+                if (spacePositions.size() == 2) {
                     break;
-                if (spaceIndex.size() == 1 && rowLog.substr(0, spaceIndex[0]) == "DEL")
+                }
+                if (spacePositions.size() == 1 && logEntry.substr(0, spacePositions[0]) == "DEL") {
                     break;
+                }
             }
 
-            if (spaceIndex.size() == 1) {
-                operationType = rowLog.substr(0, spaceIndex[0]);
-                std::stringstream keyStringStream(rowLog.substr(spaceIndex[0] + 1, spaceIndex[1] - spaceIndex[0] - 1));
-                keyStringStream >> key;
+            if (spacePositions.size() == 1) {
+                operation = logEntry.substr(0, spacePositions[0]);
+                std::stringstream keyStream(logEntry.substr(spacePositions[0] + 1));
+                keyStream >> key;
 
-                this->delKV(key);
-            } else if (spaceIndex.size() == 2) {
-                operationType = rowLog.substr(0, spaceIndex[0]);
+                delKV(key);
+            } else if (spacePositions.size() == 2) {
+                operation = logEntry.substr(0, spacePositions[0]);
 
-                std::stringstream keyStringStream(rowLog.substr(spaceIndex[0] + 1, spaceIndex[1] - spaceIndex[0] - 1));
-                keyStringStream >> key;
+                std::stringstream keyStream(logEntry.substr(spacePositions[0] + 1, spacePositions[1] - spacePositions[0] - 1));
+                keyStream >> key;
 
-                val = rowLog.substr(spaceIndex[1] + 1);
+                value = logEntry.substr(spacePositions[1] + 1);
 
-                this->putKV(key, val);
+                putKV(key, value);
             }
         }
     }
 }
 
-bool MemTable::putCheck(uint64_t key, const std::string &s) {
-    size_t putSpace = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t);
+bool MemTable::putCheck(uint64_t key, const std::string &value)  {
+    size_t requiredSpace = sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t);
 
-    if (sstSpaceSize + putSpace <= sstable_maxSize)
-        return true;
-    return false;
-
+    return (sstSpaceSize + requiredSpace <= sstable_maxSize);
 }
 
-void MemTable::copyAll(std::list<std::pair<uint64_t, std::string>> &list) {
-    this->skiplist->copyAll(list);
+void MemTable::copyAll(std::list<std::pair<uint64_t, std::string>> &kvList)  {
+    skiplist->copyAll(kvList);
 }
